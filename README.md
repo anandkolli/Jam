@@ -42,3 +42,6 @@ docker run -p 9090:9090 -e POSTGRESSADDR="<ip-addr-post-gress>" <image-name>
  
 ### /api/v1/activity/sessions
      session is defined if there has been more than a 30 minute break
+
+### /api/v1/activity/funnel
+     to populate the data in funnel
