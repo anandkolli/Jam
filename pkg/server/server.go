@@ -18,6 +18,7 @@ const (
         timeSpentPerPerson = baseURL + "/persons"
 	personsSpentAnyTime = timeSpentPerPerson + "/count"
 	sessions = baseURL + "/sessions"
+	funnel = baseURL + "/funnel"
 )
 
 // Server holds the address on which it binds and an instance of DB
@@ -61,6 +62,10 @@ func (s *Server) setHandlers() {
 
         s.router.HandleFunc(sessions, func(w http.ResponseWriter, r *http.Request) {
                 handlers.GetSessions(s.db, w, r)
+        }).Methods("GET")
+
+        s.router.HandleFunc(funnel, func(w http.ResponseWriter, r *http.Request) {
+                handlers.GetFunnel(s.db, w, r)
         }).Methods("GET")
 }
 
