@@ -299,7 +299,7 @@ func GetFunnel(db *pg.PgClient, w http.ResponseWriter, r *http.Request) error {
 		case 1:
 			f.Name = "1 to 10 minutes"
 			f.Color = "#83a6ed"
-			query = "with foo as(select aws_face_id, count(*) from face_activity group by aws_face_id having (count(*) < 10 and count(*) > 1)) select count(*) from foo"
+			query = "with foo as(select aws_face_id, count(*) from face_activity group by aws_face_id having count(*) <= 10 and count(*) > 1) select count(*) from foo"
 		case 2:
 			f.Name = "greater than 10 minutes"
 			f.Color = "#8dd1e1"
