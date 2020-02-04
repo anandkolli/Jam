@@ -265,7 +265,7 @@ func GetFunnel(db *pg.PgClient, w http.ResponseWriter, r *http.Request) error {
 	log.Println("GetFunnel")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	type funnelInfo struct {
-		Value string `json:"page"`
+		Value string `json:"value"`
 		Name  string `json:"name"`
 		Fill  string `json:"fill"`
 	}
@@ -284,15 +284,15 @@ func GetFunnel(db *pg.PgClient, w http.ResponseWriter, r *http.Request) error {
 		case 0:
 			f.Name = "less than 1 minute"
 			f.Fill = "#8884d8"
-			query = "with foo as(select aws_face_id, count(*) from face_activity group by aws_face_id having count(*) < 1) select count(*) from foo"
+			query = "with foo as(select aws_face_id, count(*) from face_activity group by aws_face_id having count(*) < 60) select count(*) from foo"
 		case 1:
 			f.Name = "1 to 10 minutes"
 			f.Fill = "#83a6ed"
-			query = "with foo as(select aws_face_id, count(*) from face_activity group by aws_face_id having count(*) <= 10 and count(*) > 1) select count(*) from foo"
+			query = "with foo as(select aws_face_id, count(*) from face_activity group by aws_face_id having count(*) <= 600 and count(*) > 60) select count(*) from foo"
 		case 2:
 			f.Name = "greater than 10 minutes"
 			f.Fill = "#8dd1e1"
-			query = "with foo as(select aws_face_id, count(*) from face_activity group by aws_face_id having count(*) > 10) select count(*) from foo"
+			query = "with foo as(select aws_face_id, count(*) from face_activity group by aws_face_id having count(*) > 600) select count(*) from foo"
 		}
 		if rows, err = db.Pdb.Query(query); err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
@@ -306,6 +306,10 @@ func GetFunnel(db *pg.PgClient, w http.ResponseWriter, r *http.Request) error {
 			if err = rows.Scan(&count); err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
 				return err
+			}
+			if count == "0" {
+				log.Println("count 0")
+				continue
 			}
 			f.Value = count
 			fun = append(fun, f)
