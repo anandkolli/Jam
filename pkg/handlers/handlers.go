@@ -89,12 +89,7 @@ func GetTimeSpentPerPerson(db *pg.PgClient, w http.ResponseWriter, r *http.Reque
 		Email string `json:"email"`
 		Count string `json:"count"`
 	}
-	type TimeSpentPerPerson struct {
-		Persons	[]Person `json: "person"`
-	}
-
 	var (
-		data TimeSpentPerPerson
 		per  []Person
 		rows *sql.Rows
 		err error
@@ -132,9 +127,8 @@ func GetTimeSpentPerPerson(db *pg.PgClient, w http.ResponseWriter, r *http.Reque
 		log.Println("Email | Count")
 		fmt.Printf("%3v | %8v \n", email, count)
 	}
-	data.Persons = per
-	log.Println("Data", data)
-	json.NewEncoder(w).Encode(data)
+	log.Println("Data", per)
+	json.NewEncoder(w).Encode(per)
 	return nil
 }
 
@@ -271,18 +265,13 @@ func GetFunnel(db *pg.PgClient, w http.ResponseWriter, r *http.Request) error {
 	log.Println("GetFunnel")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	type funnelInfo struct {
-		Count string `json: "value"`
-		Name  string `json: "name"`
-		Color string `json: "fill"`
-	}
-
-	type funnel struct {
-		Info []funnelInfo `json: "funnel"`
+		Value string `json:"page"`
+		Name  string `json:"name"`
+		Fill  string `json:"fill"`
 	}
 
 	var (
 		fun []funnelInfo
-		data funnel
 		rows *sql.Rows
 		err error
 		query string
@@ -294,15 +283,15 @@ func GetFunnel(db *pg.PgClient, w http.ResponseWriter, r *http.Request) error {
 		switch i {
 		case 0:
 			f.Name = "less than 1 minute"
-			f.Color = "#8884d8"
+			f.Fill = "#8884d8"
 			query = "with foo as(select aws_face_id, count(*) from face_activity group by aws_face_id having count(*) < 1) select count(*) from foo"
 		case 1:
 			f.Name = "1 to 10 minutes"
-			f.Color = "#83a6ed"
+			f.Fill = "#83a6ed"
 			query = "with foo as(select aws_face_id, count(*) from face_activity group by aws_face_id having count(*) <= 10 and count(*) > 1) select count(*) from foo"
 		case 2:
 			f.Name = "greater than 10 minutes"
-			f.Color = "#8dd1e1"
+			f.Fill = "#8dd1e1"
 			query = "with foo as(select aws_face_id, count(*) from face_activity group by aws_face_id having count(*) > 10) select count(*) from foo"
 		}
 		if rows, err = db.Pdb.Query(query); err != nil {
@@ -318,15 +307,14 @@ func GetFunnel(db *pg.PgClient, w http.ResponseWriter, r *http.Request) error {
 				w.WriteHeader(http.StatusInternalServerError)
 				return err
 			}
-			f.Count = count
+			f.Value = count
 			fun = append(fun, f)
 			log.Println("Count")
 			fmt.Printf("%3v\n", count)
 		}
 	}
 
-	data.Info = fun
-	log.Println("Data", data)
-	json.NewEncoder(w).Encode(data)
+	log.Println("Data", fun)
+	json.NewEncoder(w).Encode(fun)
 	return nil
 }
