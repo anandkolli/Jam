@@ -121,6 +121,10 @@ func GetTimeSpentPerPerson(db *pg.PgClient, w http.ResponseWriter, r *http.Reque
 			w.WriteHeader(http.StatusInternalServerError)
 			return err
 		}
+		if count == "0" {
+			log.Println("0-Count, hence skipping")
+			continue
+		}
 		p.Email = email
 		p.Count = count
 		per = append(per, p)
@@ -282,16 +286,16 @@ func GetFunnel(db *pg.PgClient, w http.ResponseWriter, r *http.Request) error {
 
 		switch i {
 		case 0:
-			f.Name = "less than 1 minute"
-			f.Fill = "#8884d8"
-			query = "with foo as(select aws_face_id, count(*) from face_activity group by aws_face_id having count(*) < 60) select count(*) from foo"
+			f.Name = "spent any time"
+			f.Fill = "#55B75B"
+			query = "with foo as(select aws_face_id, count(*) from face_activity group by aws_face_id having count(*) > 0) select count(*) from foo"
 		case 1:
-			f.Name = "1 to 10 minutes"
-			f.Fill = "#83a6ed"
-			query = "with foo as(select aws_face_id, count(*) from face_activity group by aws_face_id having count(*) <= 600 and count(*) > 60) select count(*) from foo"
+			f.Name = "more than 1 minutes"
+			f.Fill = "#F25F5F"
+			query = "with foo as(select aws_face_id, count(*) from face_activity group by aws_face_id having count(*) > 60) select count(*) from foo"
 		case 2:
-			f.Name = "greater than 10 minutes"
-			f.Fill = "#8dd1e1"
+			f.Name = "more than 10 minutes"
+			f.Fill = "#FC9500"
 			query = "with foo as(select aws_face_id, count(*) from face_activity group by aws_face_id having count(*) > 600) select count(*) from foo"
 		}
 		if rows, err = db.Pdb.Query(query); err != nil {
@@ -308,7 +312,6 @@ func GetFunnel(db *pg.PgClient, w http.ResponseWriter, r *http.Request) error {
 				return err
 			}
 			if count == "0" {
-				log.Println("count 0")
 				continue
 			}
 			f.Value = count
@@ -320,5 +323,46 @@ func GetFunnel(db *pg.PgClient, w http.ResponseWriter, r *http.Request) error {
 
 	log.Println("Data", fun)
 	json.NewEncoder(w).Encode(fun)
+	return nil
+}
+
+func GetVip(db *pg.PgClient, w http.ResponseWriter, r *http.Request) error {
+	log.Println("GetVip")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	type vip struct {
+		Name string `json:"name"`
+		Image string `json:"image"`
+	}
+	var (
+		data []vip
+		rows *sql.Rows
+		err error
+	)
+
+	if rows, err = db.Pdb.Query("select distinct on (email) email, img_url from face_activity inner join faces on faces.aws_face_id = face_activity.aws_face_id and faces.vip = 'true' where the_time > now() - interval '60 minutes' ORDER by email ASC, the_time DESC"); err != nil {
+		log.Println("Error", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return err
+	}
+
+	log.Println("Rows", rows)
+	defer rows.Close()
+
+	for rows.Next() {
+		var name  string
+		var image string
+		var v vip
+		if err = rows.Scan(&name, &image); err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return err
+		}
+		v.Name = name
+		v.Image = image
+		data = append(data, v)
+		log.Println("Name  | Image")
+		fmt.Printf("%3v | %8v \n", name, image)
+	}
+	log.Println("Data", data)
+	json.NewEncoder(w).Encode(data)
 	return nil
 }
