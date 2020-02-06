@@ -82,7 +82,52 @@ func GetAllActivity(db *pg.PgClient, w http.ResponseWriter, r *http.Request) err
 
 }
 
+// /api/v1/activity/persons
 func GetTimeSpentPerPerson(db *pg.PgClient, w http.ResponseWriter, r *http.Request) error {
+	log.Println("GetTimeSpentPerPerson")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	type Person struct {
+		Email string `json:"email"`
+		Count string `json:"count"`
+		Image string `json:"image_url"`
+	}
+	var (
+		per  []Person
+		rows *sql.Rows
+		err error
+	)
+
+	if rows, err = db.Pdb.Query("select distinct on(aws_face_id) face_activity.aws_face_id,LAST_VALUE(face_activity.img_url) over (partition by face_activity.aws_face_id order by face_activity.the_time ASC) as img_url,count(*) over (partition by face_activity.aws_face_id),faces.email from face_activity inner join faces on faces.aws_face_id = face_activity.aws_face_id"); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return err
+	}
+
+	defer rows.Close()
+
+	for rows.Next() {
+		var faceID, image, count, email string
+		var p Person
+		if err = rows.Scan(&faceID, &image, &count, &email); err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return err
+		}
+		if count == "0" {
+			log.Println("0-Count, hence skipping")
+			continue
+		}
+		p.Email = email
+		p.Count = count
+		p.Image = image
+		per = append(per, p)
+		log.Println("Email | Count")
+		fmt.Printf("%3v | %8v \n", email, count)
+	}
+	log.Println("Data", per)
+	json.NewEncoder(w).Encode(per)
+	return nil
+}
+
+func GetTimeSpentPerPersonDuratoin(db *pg.PgClient, w http.ResponseWriter, r *http.Request) error {
 	log.Println("GetTimeSpentPerPerson")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	type Person struct {
@@ -98,17 +143,10 @@ func GetTimeSpentPerPerson(db *pg.PgClient, w http.ResponseWriter, r *http.Reque
 	duration := r.FormValue("duration")
 
 	log.Println("duration=", duration)
-	if duration == "" {
-		if rows, err = db.Pdb.Query("SELECT faces.email, COUNT(*) AS c FROM face_activity INNER JOIN faces ON faces.aws_face_id = face_activity.aws_face_id GROUP BY faces.email"); err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			return err
-		}
-	} else {
-		query := fmt.Sprintf("SELECT faces.email, COUNT(*) AS c FROM face_activity INNER JOIN faces ON faces.aws_face_id = face_activity.aws_face_id GROUP BY faces.email HAVING COUNT(*) > %s",duration)
-		if rows, err = db.Pdb.Query(query); err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			return err
-		}
+	query := fmt.Sprintf("SELECT faces.email, COUNT(*) AS c FROM face_activity INNER JOIN faces ON faces.aws_face_id = face_activity.aws_face_id GROUP BY faces.email HAVING COUNT(*) > %s",duration)
+	if rows, err = db.Pdb.Query(query); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return err
 	}
 
 	defer rows.Close()
@@ -223,12 +261,8 @@ func GetSessions(db *pg.PgClient, w http.ResponseWriter, r *http.Request) error 
 	log.Println("GetSessions")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	type sessionInfo struct {
-		FaceID string `json: "faceID"`
-		Count string `json: "count"`
-	}
-
-	type sessions struct {
-		Sinfo []sessionInfo `json: "sessions"`
+		FaceID string `json:"name"`
+		Count string `json:"count"`
 	}
 
 	var (
@@ -244,7 +278,6 @@ func GetSessions(db *pg.PgClient, w http.ResponseWriter, r *http.Request) error 
 
 	defer rows.Close()
 
-	var data sessions
 	for rows.Next() {
 		var ses sessionInfo
 		var faceID, count string
@@ -258,9 +291,8 @@ func GetSessions(db *pg.PgClient, w http.ResponseWriter, r *http.Request) error 
 		log.Println("FaceID | Count")
 		fmt.Printf("%3v | %8v \n", faceID, count)
 	}
-	data.Sinfo = sesSlice
-	log.Println("Data", data)
-	json.NewEncoder(w).Encode(data)
+	log.Println("Data", sesSlice)
+	json.NewEncoder(w).Encode(sesSlice)
 	return nil
 
 }
@@ -359,6 +391,44 @@ func GetVip(db *pg.PgClient, w http.ResponseWriter, r *http.Request) error {
 		v.Name = name
 		v.Image = image
 		data = append(data, v)
+		log.Println("Name  | Image")
+		fmt.Printf("%3v | %8v \n", name, image)
+	}
+	log.Println("Data", data)
+	json.NewEncoder(w).Encode(data)
+	return nil
+}
+
+func GetLatesVip(db *pg.PgClient, w http.ResponseWriter, r *http.Request) error {
+	log.Println("GetLatesVip")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	type vip struct {
+		Name string `json:"name"`
+		Image string `json:"image_url"`
+	}
+	var (
+		data vip
+		rows *sql.Rows
+		err error
+	)
+
+	if rows, err = db.Pdb.Query("select faces.email, face_activity.aws_face_id, the_time, face_activity.img_url from face_activity inner join faces on faces.aws_face_id = face_activity.aws_face_id and faces.vip=true where face_activity.the_time > now() - INTERVAL '1 minute' order by the_time DESC limit 1;"); err != nil {
+		log.Println("Error", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return err
+	}
+
+	log.Println("Rows", rows)
+	defer rows.Close()
+
+	for rows.Next() {
+		var name, faceID, tStamp, image  string
+		if err = rows.Scan(&name, &faceID, &tStamp, &image); err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return err
+		}
+		data.Name = name
+		data.Image = image
 		log.Println("Name  | Image")
 		fmt.Printf("%3v | %8v \n", name, image)
 	}

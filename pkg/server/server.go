@@ -20,6 +20,7 @@ const (
 	sessions = baseURL + "/sessions"
 	funnel = baseURL + "/funnel"
 	vip = baseURL + "/vip"
+	latestVip = baseURL + "/latest_vip"
 )
 
 // Server holds the address on which it binds and an instance of DB
@@ -71,6 +72,10 @@ func (s *Server) setHandlers() {
 
         s.router.HandleFunc(vip, func(w http.ResponseWriter, r *http.Request) {
                 handlers.GetVip(s.db, w, r)
+        }).Methods("GET")
+
+        s.router.HandleFunc(latestVip, func(w http.ResponseWriter, r *http.Request) {
+                handlers.GetLatesVip(s.db, w, r)
         }).Methods("GET")
 }
 

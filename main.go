@@ -11,7 +11,7 @@ import (
 
 const (
   user     = "postgres"
-  dbname   = "phxjam"
+  dbname   = "test"
 )
 
 var (
